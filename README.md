@@ -1,10 +1,11 @@
+
 # 🏏 Match Predictor
 
 A professional match prediction app built with **React + Vite + Supabase**.
 
 ## Features
 
-- **Admin Panel** — password-protected (`password123`), create matches (team1, team2, name, date, 15:30/19:30 IST time), view all matches with open/closed status
+- **Admin Panel** — password-protected (), create matches (team1, team2, name, date, 15:30/19:30 IST time), view all matches with open/closed status
 - **Player Panel** — select your user profile, view all matches (newest first), submit or edit your team pick before match time, locked after match starts
 - **Real-time IST cutoff** — predictions auto-close when match time passes in IST (Asia/Kolkata)
 - **Dark sports aesthetic** — Bebas Neue + DM Sans, gold accents, animated cards
