@@ -13,6 +13,11 @@ export default function LoginPage({ onAdminLogin, onUserLogin }) {
   const [selectedUserId, setSelectedUserId] = useState('')
   const [loadingUsers, setLoadingUsers] = useState(false)
   const [userError, setUserError] = useState('')
+  const [showPasswordPrompt, setShowPasswordPrompt] = useState(false)
+  const [enteredPassword, setEnteredPassword] = useState('')
+  const [selectedUser, setSelectedUser] = useState(null)
+  const [userStep, setUserStep] = useState(1)
+
 
   const handleAdminClick = () => {
     setMode('admin')
@@ -24,12 +29,19 @@ export default function LoginPage({ onAdminLogin, onUserLogin }) {
     setMode('user')
     setLoadingUsers(true)
     setUserError('')
+
     const { data, error } = await supabase
       .from('users')
-      .select('id, name, email')
+      .select('id, name, email, password')
       .order('name')
+
     setLoadingUsers(false)
-    if (error) { setUserError('Failed to load users.'); return }
+
+    if (error) {
+      setUserError('Failed to load users.')
+      return
+    }
+
     setUsers(data || [])
   }
 
@@ -45,9 +57,34 @@ export default function LoginPage({ onAdminLogin, onUserLogin }) {
 
   const handleUserSubmit = (e) => {
     e.preventDefault()
+
     const user = users.find(u => u.id === selectedUserId)
-    if (user) onUserLogin(user)
-    else setUserError('Please select a user.')
+
+    if (!user) {
+      setUserError('Please select a user.')
+      return
+    }
+
+    setSelectedUser(user)
+    setEnteredPassword('')
+    setUserError('')
+    setUserStep(2)   // 👉 move to password step (smooth UI change)
+  }
+
+  const handlePasswordSubmit = (e) => {
+    e.preventDefault()
+
+    if (!enteredPassword) {
+      setUserError('Enter password')
+      return
+    }
+
+    if (selectedUser.password === enteredPassword) {
+      onUserLogin(selectedUser)
+    } else {
+      setUserError('Incorrect password ❌')
+      setEnteredPassword('')
+    }
   }
 
   const handleBack = () => {
@@ -125,47 +162,102 @@ export default function LoginPage({ onAdminLogin, onUserLogin }) {
 
         {/* Mode: User Select */}
         {mode === 'user' && (
-          <form style={styles.form} onSubmit={handleUserSubmit} className="animate-in">
-            <div style={styles.formHeader}>
-              <Users size={20} color="#60a5fa" />
-              <span style={{ ...styles.formTitle, color: '#60a5fa' }}>Select Your Profile</span>
-            </div>
-            <div style={styles.inputGroup}>
-              <label style={styles.label}>Who are you?</label>
-              {loadingUsers ? (
-                <div style={styles.loadingRow}>
-                  <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} color="var(--gold)" />
-                  <span style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Loading players...</span>
+          <form style={styles.form} onSubmit={
+            userStep === 1 ? handleUserSubmit : handlePasswordSubmit
+          }>
+
+            {/* STEP 1 */}
+            {userStep === 1 && (
+              <>
+                <div style={styles.formHeader}>
+                  <Users size={20} color="#60a5fa" />
+                  <span style={{ ...styles.formTitle, color: '#60a5fa' }}>
+                    Select Your Profile
+                  </span>
                 </div>
-              ) : (
-                <div style={styles.selectWrap}>
-                  <select
-                    value={selectedUserId}
-                    onChange={e => { setSelectedUserId(e.target.value); setUserError('') }}
-                    style={styles.select}
+
+                <select
+                  value={selectedUserId}
+                  onChange={(e) => setSelectedUserId(e.target.value)}
+                  style={styles.select}
+                >
+                  <option value="">Choose user</option>
+                  {users.map(u => (
+                    <option key={u.id} value={u.id}>
+                      {u.name}
+                    </option>
+                  ))}
+                </select>
+
+                <div
+                  style={{
+                    marginTop: '1rem',
+                    display: 'flex',
+                    justifyContent: 'flex-end', // 👈 pushes to right
+                  }}
+                >
+                  <button
+                    type="submit"
+                    style={{
+                      ...styles.btnPrimary,
+                      opacity: !selectedUserId ? 0.5 : 1,
+                      cursor: !selectedUserId ? 'not-allowed' : 'pointer',
+                      background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+                    }}
                   >
-                    <option value="">— Choose your name —</option>
-                    {users.map(u => (
-                      <option key={u.id} value={u.id}>
-                        {u.name}{u.email ? ` (${u.email})` : ''}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown size={16} color="var(--text-secondary)" style={styles.selectArrow} />
+                    Continue
+                  </button>
                 </div>
-              )}
-              {userError && <p style={styles.errorMsg}>{userError}</p>}
-            </div>
-            <div style={styles.btnRow}>
-              <button type="button" style={styles.btnSecondary} onClick={handleBack}>Back</button>
-              <button
-                type="submit"
-                style={{ ...styles.btnPrimary, background: 'linear-gradient(135deg, #3b82f6, #2563eb)' }}
-                disabled={!selectedUserId}
-              >
-                Continue
-              </button>
-            </div>
+              </>
+            )}
+
+            {/* STEP 2 */}
+            {userStep === 2 && (
+              <>
+                <div style={styles.formHeader}>
+                  <Shield size={20} color="#60a5fa" />
+                  <span style={styles.formTitle}>Enter Password</span>
+                </div>
+
+                <input
+                  type="password"
+                  value={enteredPassword}
+                  onChange={(e) => setEnteredPassword(e.target.value)}
+                  style={styles.input}
+                />
+                {userError && <p style={{ color: 'red', marginTop: '0.5rem' }}>{userError}</p>}
+
+                <div style={styles.btnRow}>
+
+                  <div
+                    style={{
+                      marginTop: '1rem',
+                      display: 'flex',
+                      justifyContent: 'space-between', // or flex-end
+                      alignItems: 'center',
+                      gap: '12px',
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setUserStep(1)}
+                      style={styles.btnSecondary}
+                    >
+                      Back
+                    </button>
+
+                    <button
+                      type="submit"
+                      style={styles.btnPrimary}
+                      disabled={!enteredPassword}
+                    >
+                      Login
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+
           </form>
         )}
 
