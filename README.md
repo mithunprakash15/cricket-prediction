@@ -1,0 +1,161 @@
+# 🏏 Match Predictor
+
+A professional match prediction app built with **React + Vite + Supabase**.
+
+## Features
+
+- **Admin Panel** — password-protected (`password123`), create matches (team1, team2, name, date, 15:30/19:30 IST time), view all matches with open/closed status
+- **Player Panel** — select your user profile, view all matches (newest first), submit or edit your team pick before match time, locked after match starts
+- **Real-time IST cutoff** — predictions auto-close when match time passes in IST (Asia/Kolkata)
+- **Dark sports aesthetic** — Bebas Neue + DM Sans, gold accents, animated cards
+
+---
+
+## Setup
+
+### 1. Clone / unzip the project
+
+```bash
+cd match-predictor
+npm install
+```
+
+### 2. Configure Supabase
+
+Copy `.env.example` to `.env` and fill in your credentials:
+
+```bash
+cp .env.example .env
+```
+
+```env
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key-here
+```
+
+Find these in your Supabase project → Settings → API.
+
+### 3. Run the DB migrations
+
+In your Supabase SQL editor, run:
+
+```sql
+-- USERS TABLE
+create table public.users (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  email text unique,
+  created_at timestamp with time zone default now()
+);
+
+-- TEAMS TABLE
+create table public.teams (
+  id uuid primary key default gen_random_uuid(),
+  team_name text not null unique,
+  created_at timestamp with time zone default now()
+);
+
+-- MATCHES TABLE
+create table public.matches (
+  id uuid primary key default gen_random_uuid(),
+  match_name text not null,
+  match_time text,                              -- '15:30' or '19:30'
+  team1_id uuid references public.teams(id),
+  team2_id uuid references public.teams(id),
+  match_date timestamp with time zone,          -- full IST datetime stored as UTC
+  created_at timestamp with time zone default now()
+);
+
+-- MATCH ENTRIES TABLE
+create table public.match_entries (
+  id uuid primary key default gen_random_uuid(),
+  match_id uuid references public.matches(id) on delete cascade,
+  user_id uuid references public.users(id) on delete cascade,
+  selected_team_id uuid references public.teams(id),
+  logged_time timestamp with time zone default now(),
+  constraint unique_user_match unique(match_id, user_id)
+);
+```
+
+Then seed some teams and users:
+
+```sql
+-- Sample teams
+insert into public.teams (team_name) values
+  ('Chennai Super Kings'),
+  ('Mumbai Indians'),
+  ('Royal Challengers Bengaluru'),
+  ('Kolkata Knight Riders');
+
+-- Sample users
+insert into public.users (name, email) values
+  ('Mithun', 'mithun@example.com'),
+  ('Arjun', 'arjun@example.com'),
+  ('Priya', 'priya@example.com');
+```
+
+### 4. Enable Row Level Security (optional but recommended)
+
+For a private internal app, you can disable RLS or set permissive policies. For production, set up proper RLS rules.
+
+Simple open policy (for internal use):
+```sql
+alter table public.users enable row level security;
+alter table public.teams enable row level security;
+alter table public.matches enable row level security;
+alter table public.match_entries enable row level security;
+
+-- Allow all reads and writes (replace with proper auth rules in production)
+create policy "open" on public.users for all using (true) with check (true);
+create policy "open" on public.teams for all using (true) with check (true);
+create policy "open" on public.matches for all using (true) with check (true);
+create policy "open" on public.match_entries for all using (true) with check (true);
+```
+
+### 5. Start dev server
+
+```bash
+npm run dev
+```
+
+App runs at `http://localhost:5173`
+
+---
+
+## Project Structure
+
+```
+src/
+  lib/
+    supabase.js          # Supabase client (reads from .env)
+  pages/
+    LoginPage.jsx        # Role selection + admin password + user picker
+    AdminPage.jsx        # Admin dashboard with create match modal
+    UserPage.jsx         # User predictions with add/edit/lock logic
+  App.jsx                # Top-level router
+  main.jsx               # Entry point
+  index.css              # Global CSS variables + animations
+index.html               # Fonts (Bebas Neue + DM Sans)
+vite.config.js
+```
+
+---
+
+## How it works
+
+| Scenario | Behaviour |
+|---|---|
+| Match time **not yet passed** (IST) | Player can add or edit their pick |
+| Match time **has passed** (IST) | Pick form is locked; existing pick is shown |
+| **No pick made** before close | Shows "No pick submitted — match is closed" |
+| Admin creates match | Stores full IST datetime as UTC in `match_date`, time label in `match_time` |
+| Duplicate pick attempt | Supabase unique constraint `(match_id, user_id)` prevents it; app uses UPDATE for edits |
+
+---
+
+## Build for production
+
+```bash
+npm run build
+# Output in /dist — deploy to Netlify, Vercel, etc.
+```
